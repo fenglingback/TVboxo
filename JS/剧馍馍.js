@@ -1,99 +1,111 @@
 var rule = {
     title: '剧馍馍',
+    编码: 'utf-8',
     host: 'https://www.jumomo.top',
-    
-    // ===== 搜索配置 =====
+    homeUrl: '/',
+    url: '/vodshow/fyclass--------fypage---.html',
+    detailUrl: '/voddetail/fyid.html',
     searchUrl: '/vodsearch/-------------.html?wd=**',
     searchable: 2,
     quickSearch: 1,
     filterable: 0,
-    
-    // ===== 请求头 =====
     headers: {
         'User-Agent': 'MOBILE_UA'
     },
+    timeout: 5000,
     
-    // ===== 播放解析 =====
-    lazy: `js:
-        // 提取播放器配置JSON
-        var html = request(input);
-        var jsonMatch = html.match(/var player_aaaa=(\\{.*?\\})<\\/script>/);
-        if (!jsonMatch) {
-            // 备用匹配方式
-            jsonMatch = html.match(/player_aaaa[=:]\\s*(\\{.*?\\})[;,\\s]/);
+    class_name: '电影&剧集&综艺&动漫',
+    class_url: '1&2&3&4',
+    
+    // 首页推荐显示数量
+    limit: 6,
+    double: false,
+    
+    // 线路过滤和排序
+    tab_exclude: '猜你喜欢',
+    tab_order: ['自营b', '自营c', '自营d', '自营e', '自营f'],
+    tab_rename: {
+        '自营b': 'B线',
+        '自营c': 'C线', 
+        '自营d': 'D线',
+        '自营e': 'E线',
+        '自营f': 'F线',
+        'FF有广': 'FF线',
+        'LZ有广': 'LZ线',
+        'BF有广': 'BF线',
+        'YZ有广': 'YZ线'
+    },
+    
+    // 服务器解析播放
+    play_parse: true,
+    play_json: [{
+        re: '*',
+        json: {
+            jx: 0,
+            parse: 1
         }
-        
-        if (jsonMatch) {
-            var data = JSON.parse(jsonMatch[1]);
-            var url = data.url;
-            var from = data.from || '';
-            var encrypt = data.encrypt || 0;
+    }],
+    
+    // 自定义免嗅
+    lazy: `js:
+        let html = request(input);
+        let json = html.match(/var player_aaaa=(\\{.*?\\})<\\/script>/);
+        if (json) {
+            let data = JSON.parse(json[1]);
+            let url = data.url;
+            let from = data.from || '';
+            let encrypt = data.encrypt || 0;
             
-            // 根据加密类型解密
+            // 根据加密类型解密 (该站url是多重的base64加密)
             if (encrypt === 1) {
                 url = unescape(url);
             } else if (encrypt === 2) {
                 url = unescape(base64Decode(url));
             } else if (encrypt === 3) {
-                // AES加密，需要解密
-                try {
-                    url = unescape(base64Decode(url));
-                } catch(e) {}
+                url = unescape(base64Decode(url));
             }
             
-            // 判断是否为直链
-            if (/.m3u8|.mp4/.test(url)) {
+            // 检测是否为直链
+            if (/m3u8|mp4/.test(url)) {
                 input = {
                     jx: 0,
                     url: url,
-                    parse: 0,
-                    header: JSON.stringify({
-                        'referer': HOST,
-                        'user-agent': 'Mozilla/5.0'
-                    })
+                    parse: 0
                 };
             } else {
-                // 非直链，需要通过播放器解析
-                // 该站使用内嵌iframe方式，vid参数即为加密后的url
+                // 非直链使用iframe播放地址
                 input = {
                     jx: 0,
-                    url: HOST + '/mmplay/index.php?vid=' + url,
-                    parse: 1,
-                    header: JSON.stringify({
-                        'referer': HOST
-                    })
+                    url: HOST + '/mmplay/index.php?vid=' + data.url,
+                    parse: 1
                 };
             }
         }
     `,
     
-    limit: 6,
+    // 首页推荐
+    推荐: '.stui-vodlist li;.stui-vodlist__thumb&&title;.stui-vodlist__thumb&&data-original;.pic-text&&Text;.stui-vodlist__thumb&&href',
     
-    // ===== 分类配置 =====
-    class_name: '电影&剧集&综艺&动漫',
-    class_url: '1&2&3&4',
+    // 一级列表
+    一级: '.stui-vodlist li;.stui-vodlist__thumb&&title;.stui-vodlist__thumb&&data-original;.pic-text&&Text;.stui-vodlist__thumb&&href',
     
-    double: false,
-    
-    // ===== 页面解析规则 =====
-    
-    // 推荐（首页轮播）
-    推荐: '.carousel .list;.stui-vodlist__thumb&&title;.stui-vodlist__thumb&&style;.pic-text&&Text;.stui-vodlist__thumb&&href',
-    
-    // 一级（列表页）
-    // 格式: 容器;标题;图片;备注;链接
-    一级: '.stui-vodlist__box;.stui-vodlist__thumb&&title;.stui-vodlist__thumb&&data-original;.pic-text&&Text;.stui-vodlist__thumb&&href',
-    
-    // 二级（详情页）
+    // 二级详情
     二级: {
-        'title': '.stui-content__detail h1.title&&Text;.data:eq(0)&&Text',
-        'img': '.stui-content__thumb img&&data-original',
-        'desc': '.stui-content__detail .data&&Text',
-        'content': '.desc&&Text',
-        'tabs': '.stui-pannel__head .title&&Text',
-        'lists': '.stui-content__playlist:eq(#id)&&li&&a&&Text;.stui-content__playlist:eq(#id)&&li&&a&&href'
+        title: '.stui-content__detail h1.title&&Text;.data--span:eq(0)&&Text',
+        img: '.stui-content__thumb img&&data-original',
+        desc: '.stui-content__detail .data:eq(2)&&Text;.stui-content__detail .data:eq(1)&&Text;.stui-content__detail .data:eq(4)&&Text;.stui-content__detail .data:eq(3)&&Text;.stui-content__detail .data:eq(5)&&Text',
+        content: '.desc&&Text',
+        tabs: '.stui-pannel__head .title&&Text',
+        tab_text: 'body&&Text',
+        lists: '.stui-content__playlist:eq(#id)&&li',
+        list_text: 'a&&Text',
+        list_url: 'a&&href'
     },
     
     // 搜索
-    搜索: '.stui-vodlist__box;.stui-vodlist__thumb&&title;.stui-vodlist__thumb&&data-original;.pic-text&&Text;.stui-vodlist__thumb&&href'
+    搜索: '.stui-vodlist__media li;.stui-vodlist__thumb&&title;.stui-vodlist__thumb&&data-original;.text-muted&&Text;a&&href',
+    
+    // 嗅探配置
+    sniffer: 1,
+    isVideo: "http((?!http).){26,}\\.(m3u8|mp4|flv|avi|mkv)"
 };
